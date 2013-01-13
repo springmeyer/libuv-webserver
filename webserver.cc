@@ -112,24 +112,24 @@ void render(uv_work_t* req) {
 void after_render(uv_work_t* req) {
   render_baton_t *closure = static_cast<render_baton_t *>(req->data);
   client_t* client = (client_t*) closure->client;
-  static uv_buf_t resbuf;
 
   LOGF("[ %5d ] after render", client->request_num);
 
   std::ostringstream rep;
-  int data_size = closure->result.size();
   rep << "HTTP/1.1 200 OK\r\n"
       << "Content-Type: text/plain\r\n"
       //<< "Connection: keep-alive\r\n"
       //<< "Connection: close\r\n"
       //<< "Transfer-Encoding: chunked\r\n"
-      << "Content-Length: " << data_size << "\r\n"
+      << "Content-Length: " << closure->result.size() << "\r\n"
       << "\r\n";
-  int header_size = rep.str().size();
   rep << closure->result;
-  resbuf.base = (char *)rep.str().c_str();
-  resbuf.len = closure->result.size() + header_size;
+  std::string res = rep.str();
+  uv_buf_t resbuf;
+  resbuf.base = (char *)res.c_str();
+  resbuf.len = res.size();
 
+  // https://github.com/joyent/libuv/issues/344
   int r = uv_write(&client->write_req,
           (uv_stream_t*)&client->handle,
           &resbuf,
