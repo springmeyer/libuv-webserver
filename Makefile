@@ -1,5 +1,5 @@
 webserver: webserver.cc libuv/libuv.a http-parser/http_parser.o
-	$(CXX) -I libuv/include -O0 -g\
+	$(CXX) -I libuv/include -O2 -g\
     -F/ -framework CoreFoundation -F/ -framework CoreServices \
     -o webserver webserver.cc \
     libuv/libuv.a http-parser/http_parser.o
