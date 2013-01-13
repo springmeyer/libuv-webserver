@@ -146,7 +146,11 @@ int on_message_complete(http_parser* parser) {
   closure->request.data = closure;
   closure->client = client;
   closure->error = false;
-  uv_queue_work(uv_default_loop(), &closure->request, render, after_render);
+  int status = uv_queue_work(uv_default_loop(),
+                 &closure->request,
+                 render,
+                 (uv_after_work_cb)after_render);
+  assert(status == 0);
 
   return 0;
 }
