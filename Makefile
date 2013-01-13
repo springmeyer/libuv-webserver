@@ -1,16 +1,21 @@
 UNAME := $(shell uname)
 
 ifeq ($(UNAME), Darwin)
-CFLAGS=-F/ -framework CoreFoundation -F/ -framework CoreServices
+LDFLAGS=-F/ -framework CoreFoundation -F/ -framework CoreServices
 endif
 
-CFLAGS+=-O2 -g -DNDEBUG -Wall
+ifeq ($(UNAME), Linux)
+LDFLAGS+=-pthread -lrt
+endif
+
+CFLAGS=-O2 -g -DNDEBUG -Wall
 
 webserver: webserver.cc libuv/libuv.a http-parser/http_parser.o
 	$(CXX) -I libuv/include \
     $(CFLAGS) \
     -o webserver webserver.cc \
-    libuv/libuv.a http-parser/http_parser.o
+    libuv/libuv.a http-parser/http_parser.o \
+    $(LDFLAGS)
 
 libuv/libuv.a:
 	$(MAKE) -C libuv
