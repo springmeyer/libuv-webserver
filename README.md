@@ -20,6 +20,5 @@ This is not a real server and never will be - purely experimental.
 
  - leverage threadpool
  - build using pure gyp
- - build as c++
- - get running on windows
+ - build as c++ 
  - signal(SIGPIPE, SIG_IGN)

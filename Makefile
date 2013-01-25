@@ -1,11 +1,15 @@
-UNAME := $(shell uname)
+uname_S := $(shell sh -c 'uname -s 2>/dev/null || echo not')
 
-ifeq ($(UNAME), Darwin)
+ifeq (Darwin,$(uname_S))
 LDFLAGS=-F/ -framework CoreFoundation -F/ -framework CoreServices
 endif
 
-ifeq ($(UNAME), Linux)
+ifeq (Linux,$(uname_S))
 LDFLAGS+=-pthread -lrt
+endif
+
+ifneq (,$(findstring MINGW,$(uname_S)))
+LDFLAGS+=-lws2_32 -lpsapi -liphlpapi
 endif
 
 CFLAGS=-O2 -g -DNDEBUG -Wall
