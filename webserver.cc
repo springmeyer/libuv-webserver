@@ -33,7 +33,7 @@ typedef struct {
 
 void on_close(uv_handle_t* handle) {
   client_t* client = (client_t*) handle->data;
-  LOGF("[ %5d ] connection closed", client->request_num);
+  LOGF("[ %5d ] connection closed\n\n", client->request_num);
   free(client);
 }
 
@@ -46,11 +46,8 @@ uv_buf_t on_alloc(uv_handle_t* client, size_t suggested_size) {
 
 void on_read(uv_stream_t* tcp, ssize_t nread, uv_buf_t buf) {
   size_t parsed;
-
+  LOGF("on read: %ld",nread);
   client_t* client = (client_t*) tcp->data;
-  LOGF("[ %5d ] on read", client->request_num);
-
-
   if (nread >= 0) {
     parsed = http_parser_execute(
         &client->parser, &parser_settings, buf.base, nread);
@@ -63,35 +60,16 @@ void on_read(uv_stream_t* tcp, ssize_t nread, uv_buf_t buf) {
     if (err.code != UV_EOF) {
       UVERR(err, "read");
     }
+    uv_close((uv_handle_t*) &client->handle, on_close);
   }
   free(buf.base);
 }
 
-void on_connect(uv_stream_t* server_handle, int status) {
-  CHECK(status, "connect");
-  assert((uv_tcp_t*)server_handle == &server);
-
-  client_t* client = (client_t*)malloc(sizeof(client_t));
-  client->request_num = request_num;
-  request_num++;
-
-  LOGF("[ %5d ] new connection", request_num);
-
-  uv_tcp_init(uv_loop, &client->handle);
-  http_parser_init(&client->parser, HTTP_REQUEST);
-
-  client->parser.data = client;
-  client->handle.data = client;
-
-  int r = uv_accept(server_handle, (uv_stream_t*)&client->handle);
-  CHECK(r, "accept");
-
-  uv_read_start((uv_stream_t*)&client->handle, on_alloc, on_read);
-}
 
 void after_write(uv_write_t* req, int status) {
   CHECK(status, "write");
-  uv_close((uv_handle_t*)req->handle, on_close);
+  if (!uv_is_closing((uv_handle_t*)req->handle))
+      uv_close((uv_handle_t*)req->handle, on_close);
 }
 
 typedef struct {
@@ -118,7 +96,7 @@ void after_render(uv_work_t* req) {
   std::ostringstream rep;
   rep << "HTTP/1.1 200 OK\r\n"
       << "Content-Type: text/plain\r\n"
-      //<< "Connection: keep-alive\r\n"
+      << "Connection: keep-alive\r\n"
       //<< "Connection: close\r\n"
       //<< "Transfer-Encoding: chunked\r\n"
       << "Content-Length: " << closure->result.size() << "\r\n"
@@ -138,7 +116,44 @@ void after_render(uv_work_t* req) {
   CHECK(r, "write buff");
 }
 
+int on_message_begin(http_parser* _) {
+  (void)_;
+  printf("\n***MESSAGE BEGIN***\n\n");
+  return 0;
+}
+
+int on_headers_complete(http_parser* _) {
+  (void)_;
+  printf("\n***HEADERS COMPLETE***\n\n");
+  return 0;
+}
+
+int on_url(http_parser* _, const char* at, size_t length) {
+  (void)_;
+  printf("Url: %.*s\n", (int)length, at);
+  return 0;
+}
+
+int on_header_field(http_parser* _, const char* at, size_t length) {
+  (void)_;
+  printf("Header field: %.*s\n", (int)length, at);
+  return 0;
+}
+
+int on_header_value(http_parser* _, const char* at, size_t length) {
+  (void)_;
+  printf("Header value: %.*s\n", (int)length, at);
+  return 0;
+}
+
+int on_body(http_parser* _, const char* at, size_t length) {
+  (void)_;
+  printf("Body: %.*s\n", (int)length, at);
+  return 0;
+}
 int on_message_complete(http_parser* parser) {
+  printf("\n***MESSAGE COMPLETE***\n\n");
+
   client_t* client = (client_t*) parser->data;
   
   LOGF("[ %5d ] on_message_complete", client->request_num);
@@ -156,15 +171,46 @@ int on_message_complete(http_parser* parser) {
 }
 
 
+void on_connect(uv_stream_t* server_handle, int status) {
+  CHECK(status, "connect");
+  assert((uv_tcp_t*)server_handle == &server);
+
+  client_t* client = (client_t*)malloc(sizeof(client_t));
+  client->request_num = request_num;
+  request_num++;
+
+  LOGF("[ %5d ] new connection", request_num);
+
+  uv_tcp_init(uv_loop, &client->handle);
+  http_parser_init(&client->parser, HTTP_REQUEST);
+
+  client->parser.data = client;
+  client->handle.data = client;
+
+  int r = uv_accept(server_handle, (uv_stream_t*)&client->handle);
+  CHECK(r, "accept");
+
+  uv_read_start((uv_stream_t*)&client->handle, on_alloc, on_read);
+}
+
+
 int main() {
+  parser_settings.on_message_begin = on_message_begin;
+  parser_settings.on_url = on_url;
+  parser_settings.on_header_field = on_header_field;
+  parser_settings.on_header_value = on_header_value;
+  parser_settings.on_headers_complete = on_headers_complete;
+  parser_settings.on_body = on_body;
   parser_settings.on_message_complete = on_message_complete;
   uv_loop = uv_default_loop();
   int r = uv_tcp_init(uv_loop, &server);
+  CHECK(r, "bind");
+  r = uv_tcp_keepalive(&server,1,1);
   CHECK(r, "bind");
   struct sockaddr_in address = uv_ip4_addr("0.0.0.0", 8000);
   r = uv_tcp_bind(&server, address);
   CHECK(r, "bind");
   uv_listen((uv_stream_t*)&server, 128, on_connect);
   LOG("listening on port 8000");
-  uv_run(uv_loop);
+  uv_run(uv_loop,UV_RUN_DEFAULT);
 }
