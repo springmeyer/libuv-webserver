@@ -1,7 +1,16 @@
 
 all: ./build server client
 
-./build:
+./deps/http-parser:
+	git clone --depth 1 git://github.com/joyent/http-parser.git ./deps/http-parser
+
+./deps/libuv:
+	git clone --depth 1 git://github.com/joyent/libuv.git ./deps/libuv
+
+./deps/gyp:
+	git clone --depth 1 https://chromium.googlesource.com/external/gyp.git ./deps/gyp
+
+./build: ./deps/gyp ./deps/libuv ./deps/http-parser
 	./configure
 
 client:

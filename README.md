@@ -9,20 +9,14 @@ Based on http://vimeo.com/24713213
 
 This is not a real server and never will be - purely experimental.
 
-git ci -a -m "update to latest libuv + move to gyp for building"
+If you are interested in more robust server on top of libuv see [Haywire](https://github.com/kellabyte/Haywire).
+
+
 ## Build
 
-    mkdir deps && cd deps
-    git clone git://github.com/joyent/http-parser.git
-    git clone git://github.com/joyent/libuv.git
-    git clone https://chromium.googlesource.com/external/gyp.git
-    cd ../
-    ./configure
     make
 
 ## TODO
 
  - leverage threadpool
- - build using pure gyp
- - build as c++ 
  - signal(SIGPIPE, SIG_IGN)
