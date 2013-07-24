@@ -1,5 +1,5 @@
 
-all: ./build server client
+all: ./build ./webclient ./webserver
 
 ./deps/http-parser:
 	git clone --depth 1 git://github.com/joyent/http-parser.git ./deps/http-parser
@@ -11,13 +11,13 @@ all: ./build server client
 	git clone --depth 1 https://chromium.googlesource.com/external/gyp.git ./deps/gyp
 
 ./build: ./deps/gyp ./deps/libuv ./deps/http-parser
-	./configure
+	deps/gyp/gyp --depth=. -Goutput_dir=./out -Icommon.gypi --generator-output=./build -Dlibrary=static_library -f make
 
-client:
+./webclient:
 	make -C ./build/ webclient
 	cp ./build/out/Release/webclient ./webclient
 
-server:
+./webserver:
 	make -C ./build/ webserver
 	cp ./build/out/Release/webserver ./webserver
 

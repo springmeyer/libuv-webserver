@@ -1,3 +1,0 @@
-#!/bin/sh
-
-deps/gyp/gyp --depth=. -Goutput_dir=./out -Icommon.gypi --generator-output=./build -Dlibrary=static_library -f make $@
