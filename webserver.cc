@@ -36,19 +36,16 @@ void on_close(uv_handle_t* handle) {
   free(client);
 }
 
-uv_buf_t on_alloc(uv_handle_t* client, size_t suggested_size) {
-  uv_buf_t buf;
-  buf.base = (char *)malloc(suggested_size);
-  buf.len = suggested_size;
-  return buf;
+uv_buf_t alloc_buffer(uv_handle_t * /*handle*/, size_t suggested_size) {
+    return uv_buf_init((char*) malloc(suggested_size), suggested_size);
 }
 
 void on_read(uv_stream_t* tcp, ssize_t nread, uv_buf_t buf) {
-  size_t parsed;
+  ssize_t parsed;
   LOGF("on read: %ld",nread);
   client_t* client = (client_t*) tcp->data;
   if (nread >= 0) {
-    parsed = http_parser_execute(
+    parsed = (ssize_t)http_parser_execute(
         &client->parser, &parser_settings, buf.base, nread);
     if (parsed < nread) {
       LOG_ERROR("parse error");
@@ -163,6 +160,7 @@ int on_message_complete(http_parser* parser) {
                  &closure->request,
                  render,
                  (uv_after_work_cb)after_render);
+  CHECK(status, "uv_queue_work");
   assert(status == 0);
 
   return 0;
@@ -188,7 +186,7 @@ void on_connect(uv_stream_t* server_handle, int status) {
   int r = uv_accept(server_handle, (uv_stream_t*)&client->handle);
   CHECK(r, "accept");
 
-  uv_read_start((uv_stream_t*)&client->handle, on_alloc, on_read);
+  uv_read_start((uv_stream_t*)&client->handle, alloc_buffer, on_read);
 }
 
 #define MAX_WRITE_HANDLES 1000

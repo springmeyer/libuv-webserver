@@ -39,7 +39,7 @@ struct client_t {
   std::stringstream body;
 };
 
-uv_buf_t alloc_buffer(uv_handle_t *handle, size_t suggested_size) {
+uv_buf_t alloc_buffer(uv_handle_t * /*handle*/, size_t suggested_size) {
     return uv_buf_init((char*) malloc(suggested_size), suggested_size);
 }
 
@@ -51,7 +51,7 @@ void on_close(uv_handle_t* handle) {
 }
 
 void on_read(uv_stream_t *tcp, ssize_t nread, uv_buf_t buf) {
-    size_t parsed;
+    ssize_t parsed;
     client_t* client = (client_t*) tcp->data;
     LOGF("on read: %ld",nread);
     LOGF("on read buf.size: %ld",buf.len);
@@ -61,12 +61,12 @@ void on_read(uv_stream_t *tcp, ssize_t nread, uv_buf_t buf) {
              LOG("PAUSED");
              return ;
         }*/
-        parsed = http_parser_execute(parser, &req_parser_settings, buf.base, nread);
+        parsed = (ssize_t)http_parser_execute(parser, &req_parser_settings, buf.base, nread);
         if (parser->upgrade) {
             LOG("We do not support upgrades yet")
         }
         else if (parsed != nread) {
-          LOGF("parsed incomplete data::%ld/%ld bytes parsed\n", parsed, nread);
+          LOGF("parsed incomplete data: %ld/%ld bytes parsed\n", parsed, nread);
           LOGF("\n*** %s ***\n\n",
               http_errno_description(HTTP_PARSER_ERRNO(parser)));
         }
@@ -83,7 +83,7 @@ void on_read(uv_stream_t *tcp, ssize_t nread, uv_buf_t buf) {
     free(buf.base);
 }
 
-void after_write(uv_write_t* req, int status) {
+void after_write(uv_write_t* /*req*/, int status) {
     LOG("after write")
     CHECK(status, "write");
 }
