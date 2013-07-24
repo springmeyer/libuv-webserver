@@ -13,19 +13,20 @@ all: ./build ./webclient ./webserver
 ./build: ./deps/gyp ./deps/libuv ./deps/http-parser
 	deps/gyp/gyp --depth=. -Goutput_dir=./out -Icommon.gypi --generator-output=./build -Dlibrary=static_library -f make
 
-./webclient:
+./webclient: webclient.cc
 	make -C ./build/ webclient
 	cp ./build/out/Release/webclient ./webclient
 
-./webserver:
+./webserver: webserver.cc
 	make -C ./build/ webserver
 	cp ./build/out/Release/webserver ./webserver
 
 distclean:
+	make clean
 	rm -rf ./build
 
 test:
-	./build/out/Release/webserver & ./build/out/Release/webclient
+	./build/out/Release/webserver & ./build/out/Release/webclient && killall webserver
 
 clean:
 	rm -rf ./build/out/Release/obj.target/webserver/
