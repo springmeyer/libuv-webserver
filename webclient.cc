@@ -181,6 +181,34 @@ int on_message_complete(http_parser* parser) {
   return 0;
 }
 
+void on_resolved(uv_getaddrinfo_t *req, int status, struct addrinfo *res) {
+    if (status == -1) {
+        fprintf(stderr, "getaddrinfo callback error %s\n", uv_err_name(status));
+        return;
+    }
+
+    char addr[17] = {'\0'};
+    uv_ip4_name((struct sockaddr_in*) res->ai_addr, addr, 16);
+    fprintf(stderr, "resolved to %s\n", addr);
+    uv_freeaddrinfo(res);
+    struct sockaddr_in dest = uv_ip4_addr(addr, 8000);
+
+    for (int i=0;i<req_num;++i) {
+        client_t* client = new client_t();
+        client->request_num = request_num;
+        client->tcp.data = client;
+        http_parser_init(&client->parser, HTTP_RESPONSE);
+        client->parser.data = client;
+        int r = uv_tcp_init(uv_loop, &client->tcp);
+        CHECK(r, "tcp_init");
+        r = uv_tcp_keepalive(&client->tcp,1,60);
+        CHECK(r, "tcp_keepalive");
+        r = uv_tcp_connect(&client->connect_req, &client->tcp, dest, on_connect);
+        CHECK(r, "tcp_connect");
+    }
+    LOG("listening on port 8000");
+}
+
 int main() {
     // mainly for osx, bump up ulimit
     struct rlimit limit;
@@ -193,35 +221,13 @@ int main() {
     req_parser_settings.on_headers_complete = on_headers_complete;
     req_parser_settings.on_body = on_body;
     req_parser_settings.on_message_complete = on_message_complete;
-
-    struct sockaddr_in dest = uv_ip4_addr("127.0.0.1", 8000);
-
+    struct addrinfo hints;
+    hints.ai_family = PF_INET;
+    hints.ai_socktype = SOCK_STREAM;
+    hints.ai_protocol = IPPROTO_TCP;
+    hints.ai_flags = 0;
     uv_loop = uv_default_loop();
-    for (int i=0;i<req_num;++i) {
-        client_t* client = new client_t();
-        client->request_num = request_num;
-        client->tcp.data = client;
-        http_parser_init(&client->parser, HTTP_RESPONSE);
-        client->parser.data = client;
-        int r = uv_tcp_init(uv_loop, &client->tcp);
-        CHECK(r, "bind");
-        //r = uv_tcp_keepalive(&client->tcp,1,60);
-        //CHECK(r, "bind");
-        r = uv_tcp_connect(&client->connect_req, &client->tcp, dest, on_connect);
-        CHECK(r, "bind");
-        /*
-         * This function runs the event loop. It will act differently depending on the
-         * specified mode:
-         *  - UV_RUN_DEFAULT: Runs the event loop until the reference count drops to
-         *    zero. Always returns zero.
-         *  - UV_RUN_ONCE: Poll for new events once. Note that this function blocks if
-         *    there are no pending events. Returns zero when done (no active handles
-         *    or requests left), or non-zero if more events are expected (meaning you
-         *    should run the event loop again sometime in the future).
-         *  - UV_RUN_NOWAIT: Poll for new events once but don't block if there are no
-         *    pending events.
-         */
-         uv_run(uv_loop,UV_RUN_DEFAULT);
-    }
-    LOG("listening on port 8000");
+    uv_getaddrinfo_t req;
+    int r = uv_getaddrinfo(uv_loop, &req, on_resolved, "localhost", "8000", &hints);
+    uv_run(uv_loop,UV_RUN_DEFAULT);
 }

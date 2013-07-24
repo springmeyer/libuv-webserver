@@ -203,7 +203,7 @@ int main() {
   uv_loop = uv_default_loop();
   int r = uv_tcp_init(uv_loop, &server);
   CHECK(r, "tcp_init");
-  r = uv_tcp_keepalive(&server,1,1);
+  r = uv_tcp_keepalive(&server,1,60);
   CHECK(r, "tcp_keepalive");
   struct sockaddr_in address = uv_ip4_addr("0.0.0.0", 8000);
   r = uv_tcp_bind(&server, address);
