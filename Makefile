@@ -9,6 +9,7 @@ all: ./build ./webclient ./webserver
 
 ./deps/gyp:
 	git clone --depth 1 https://chromium.googlesource.com/external/gyp.git ./deps/gyp
+	cd ./deps/gyp && curl -o issue_292.diff https://codereview.chromium.org/download/issue14887003_1_2.diff && patch pylib/gyp/xcode_emulation.py issue_292.diff
 
 ./build: ./deps/gyp ./deps/libuv ./deps/http-parser
 	deps/gyp/gyp --depth=. -Goutput_dir=./out -Icommon.gypi --generator-output=./build -Dlibrary=static_library -f make
