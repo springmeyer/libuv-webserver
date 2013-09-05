@@ -205,7 +205,7 @@ void on_resolved(uv_getaddrinfo_t *req, int status, struct addrinfo *res) {
         CHECK(r, "tcp_init");
         r = uv_tcp_keepalive(&client->tcp,1,60);
         CHECK(r, "tcp_keepalive");
-        r = uv_tcp_connect(&client->connect_req, &client->tcp, &dest, on_connect);
+        r = uv_tcp_connect(&client->connect_req, &client->tcp, (const struct sockaddr*)&dest, on_connect);
         CHECK(r, "tcp_connect");
     }
     LOG("listening on port 8000");
