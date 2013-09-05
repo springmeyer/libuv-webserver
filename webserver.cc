@@ -36,17 +36,17 @@ void on_close(uv_handle_t* handle) {
   free(client);
 }
 
-uv_buf_t alloc_buffer(uv_handle_t * /*handle*/, size_t suggested_size) {
-    return uv_buf_init((char*) malloc(suggested_size), suggested_size);
+void alloc_cb(uv_handle_t * /*handle*/, size_t suggested_size, uv_buf_t* buf) {
+    *buf = uv_buf_init((char*) malloc(suggested_size), suggested_size);
 }
 
-void on_read(uv_stream_t* tcp, ssize_t nread, uv_buf_t buf) {
+void on_read(uv_stream_t* tcp, ssize_t nread, const uv_buf_t * buf) {
   ssize_t parsed;
   LOGF("on read: %ld",nread);
   client_t* client = (client_t*) tcp->data;
   if (nread >= 0) {
     parsed = (ssize_t)http_parser_execute(
-        &client->parser, &parser_settings, buf.base, nread);
+        &client->parser, &parser_settings, buf->base, nread);
     if (parsed < nread) {
       LOG_ERROR("parse error");
       uv_close((uv_handle_t*) &client->handle, on_close);
@@ -57,7 +57,7 @@ void on_read(uv_stream_t* tcp, ssize_t nread, uv_buf_t buf) {
     }
     uv_close((uv_handle_t*) &client->handle, on_close);
   }
-  free(buf.base);
+  free(buf->base);
 }
 
 typedef struct {
@@ -186,7 +186,7 @@ void on_connect(uv_stream_t* server_handle, int status) {
   int r = uv_accept(server_handle, (uv_stream_t*)&client->handle);
   CHECK(r, "accept");
 
-  uv_read_start((uv_stream_t*)&client->handle, alloc_buffer, on_read);
+  uv_read_start((uv_stream_t*)&client->handle, alloc_cb, on_read);
 }
 
 #define MAX_WRITE_HANDLES 1000
@@ -205,8 +205,10 @@ int main() {
   CHECK(r, "tcp_init");
   r = uv_tcp_keepalive(&server,1,60);
   CHECK(r, "tcp_keepalive");
-  struct sockaddr_in address = uv_ip4_addr("0.0.0.0", 8000);
-  r = uv_tcp_bind(&server, address);
+  struct sockaddr_in address;
+  r = uv_ip4_addr("0.0.0.0", 8000, &address);
+  CHECK(r, "ip4_addr");
+  r = uv_tcp_bind(&server, (const struct sockaddr*)&address);
   CHECK(r, "tcp_bind");
   uv_listen((uv_stream_t*)&server, MAX_WRITE_HANDLES, on_connect);
   LOG("listening on port 8000");

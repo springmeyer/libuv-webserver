@@ -39,8 +39,8 @@ struct client_t {
   std::stringstream body;
 };
 
-uv_buf_t alloc_buffer(uv_handle_t * /*handle*/, size_t suggested_size) {
-    return uv_buf_init((char*) malloc(suggested_size), suggested_size);
+void alloc_cb(uv_handle_t * /*handle*/, size_t suggested_size, uv_buf_t* buf) {
+    *buf = uv_buf_init((char*) malloc(suggested_size), suggested_size);
 }
 
 void on_close(uv_handle_t* handle) {
@@ -50,18 +50,18 @@ void on_close(uv_handle_t* handle) {
   delete client;
 }
 
-void on_read(uv_stream_t *tcp, ssize_t nread, uv_buf_t buf) {
+void on_read(uv_stream_t *tcp, ssize_t nread, const uv_buf_t * buf) {
     ssize_t parsed;
     client_t* client = (client_t*) tcp->data;
     LOGF("on read: %ld",nread);
-    LOGF("on read buf.size: %ld",buf.len);
+    LOGF("on read buf.size: %ld",buf->len);
     if (nread > 0) {
         http_parser * parser = &client->parser;
         /*if (parser->http_errno == HPE_PAUSED) {
              LOG("PAUSED");
              return ;
         }*/
-        parsed = (ssize_t)http_parser_execute(parser, &req_parser_settings, buf.base, nread);
+        parsed = (ssize_t)http_parser_execute(parser, &req_parser_settings, buf->base, nread);
         if (parser->upgrade) {
             LOG("We do not support upgrades yet")
         }
@@ -80,7 +80,7 @@ void on_read(uv_stream_t *tcp, ssize_t nread, uv_buf_t buf) {
         //if (!uv_is_closing((uv_handle_t*)tcp))
             //uv_close((uv_handle_t*)tcp, on_close);
     //}
-    free(buf.base);
+    free(buf->base);
 }
 
 void after_write(uv_write_t* /*req*/, int status) {
@@ -112,7 +112,7 @@ void on_connect(uv_connect_t *req, int status) {
     resbuf.base = (char *)res.c_str();
     resbuf.len = res.size();
 
-    int rr = uv_read_start(req->handle, alloc_buffer, on_read);
+    int rr = uv_read_start(req->handle, alloc_cb, on_read);
     CHECK(rr, "bind");
     
     int r = uv_write(&client->write_req,
@@ -191,7 +191,9 @@ void on_resolved(uv_getaddrinfo_t *req, int status, struct addrinfo *res) {
     uv_ip4_name((struct sockaddr_in*) res->ai_addr, addr, 16);
     fprintf(stderr, "resolved to %s\n", addr);
     uv_freeaddrinfo(res);
-    struct sockaddr_in dest = uv_ip4_addr(addr, 8000);
+    struct sockaddr_in dest;
+    int r = uv_ip4_addr(addr, 8000, &dest);
+    CHECK(r, "ip4_addr");
 
     for (int i=0;i<req_num;++i) {
         client_t* client = new client_t();
@@ -199,11 +201,11 @@ void on_resolved(uv_getaddrinfo_t *req, int status, struct addrinfo *res) {
         client->tcp.data = client;
         http_parser_init(&client->parser, HTTP_RESPONSE);
         client->parser.data = client;
-        int r = uv_tcp_init(uv_loop, &client->tcp);
+        r = uv_tcp_init(uv_loop, &client->tcp);
         CHECK(r, "tcp_init");
         r = uv_tcp_keepalive(&client->tcp,1,60);
         CHECK(r, "tcp_keepalive");
-        r = uv_tcp_connect(&client->connect_req, &client->tcp, dest, on_connect);
+        r = uv_tcp_connect(&client->connect_req, &client->tcp, &dest, on_connect);
         CHECK(r, "tcp_connect");
     }
     LOG("listening on port 8000");
