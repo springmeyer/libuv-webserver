@@ -192,7 +192,11 @@ void on_connect(uv_stream_t* server_handle, int status) {
 #define MAX_WRITE_HANDLES 1000
 
 int main() {
-  //setenv("UV_THREADPOOL_SIZE","100",1);
+  int cores = sysconf(_SC_NPROCESSORS_ONLN);
+  printf("number of cores %d\n",cores);
+  char cores_string[10];
+  sprintf(cores_string,"%d",cores);
+  setenv("UV_THREADPOOL_SIZE",cores_string,1);
   parser_settings.on_message_begin = on_message_begin;
   parser_settings.on_url = on_url;
   parser_settings.on_header_field = on_header_field;
