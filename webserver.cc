@@ -1,6 +1,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cassert>
+#include <unistd.h> // _SC_NPROCESSORS_ONLN on OS X
 #include "uv.h"
 #include "http_parser.h"
 
