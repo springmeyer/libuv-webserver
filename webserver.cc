@@ -213,9 +213,10 @@ int main() {
   struct sockaddr_in address;
   r = uv_ip4_addr("0.0.0.0", 8000, &address);
   CHECK(r, "ip4_addr");
-  r = uv_tcp_bind(&server, (const struct sockaddr*)&address);
+  r = uv_tcp_bind(&server, (const struct sockaddr*)&address, 0);
   CHECK(r, "tcp_bind");
-  uv_listen((uv_stream_t*)&server, MAX_WRITE_HANDLES, on_connect);
+  r = uv_listen((uv_stream_t*)&server, MAX_WRITE_HANDLES, on_connect);
+  CHECK(r, "uv_listen");
   LOG("listening on port 8000");
   uv_run(uv_loop,UV_RUN_DEFAULT);
 }
