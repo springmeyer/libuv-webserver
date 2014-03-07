@@ -13,7 +13,7 @@ all: ./build ./webclient ./webserver
 	#cd ./deps/gyp && curl -o issue_292.diff https://codereview.chromium.org/download/issue14887003_1_2.diff && patch pylib/gyp/xcode_emulation.py issue_292.diff
 
 ./build: ./deps/gyp ./deps/libuv ./deps/http-parser
-	deps/gyp/gyp --depth=. -Goutput_dir=./out -Icommon.gypi --generator-output=./build -Dlibrary=static_library -f make
+	deps/gyp/gyp --depth=. -Goutput_dir=./out -Icommon.gypi --generator-output=./build -Dlibrary=static_library -Duv_library=static_library -f make
 
 ./webclient: webclient.cc
 	make -C ./build/ webclient

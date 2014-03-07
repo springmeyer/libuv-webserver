@@ -19,5 +19,4 @@ If you are interested in more robust server on top of libuv see [Haywire](https:
 ## TODO
 
  - leverage threadpool
- - signal(SIGPIPE, SIG_IGN)
  - sysctl -w net.inet.tcp.msl=1000 on OS X
