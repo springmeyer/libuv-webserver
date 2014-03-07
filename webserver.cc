@@ -1,3 +1,4 @@
+#include <signal.h>
 #include <cstdio>
 #include <cstdlib>
 #include <cassert>
@@ -193,6 +194,7 @@ void on_connect(uv_stream_t* server_handle, int status) {
 #define MAX_WRITE_HANDLES 1000
 
 int main() {
+  signal(SIGPIPE, SIG_IGN);
   int cores = sysconf(_SC_NPROCESSORS_ONLN);
   printf("number of cores %d\n",cores);
   char cores_string[10];
