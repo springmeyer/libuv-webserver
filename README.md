@@ -20,3 +20,4 @@ If you are interested in more robust server on top of libuv see [Haywire](https:
 
  - leverage threadpool
  - sysctl -w net.inet.tcp.msl=1000 on OS X
+ - SO_REUSEPORT http://lwn.net/Articles/542629/
