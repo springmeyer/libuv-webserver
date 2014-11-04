@@ -10,6 +10,7 @@
 #include <string>
 #include <sstream>
 
+#ifdef DEBUG
 #define CHECK(status, msg) \
   if (status != 0) { \
     fprintf(stderr, "%s: %s\n", msg, uv_err_name(status)); \
@@ -19,7 +20,13 @@
 #define LOG_ERROR(msg) puts(msg);
 #define LOG(msg) puts(msg);
 #define LOGF(fmt, params...) printf(fmt "\n", params);
-
+#else
+#define CHECK(status, msg)
+#define UVERR(err, msg)
+#define LOG_ERROR(msg)
+#define LOG(msg)
+#define LOGF(fmt, params...)
+#endif
 static int request_num = 1;
 static uv_loop_t* uv_loop;
 static uv_tcp_t server;
@@ -120,36 +127,36 @@ void after_render(uv_work_t* req) {
 }
 
 int on_message_begin(http_parser* /*parser*/) {
-  printf("\n***MESSAGE BEGIN***\n\n");
+  LOGF("\n***MESSAGE BEGIN***\n\n");
   return 0;
 }
 
 int on_headers_complete(http_parser* /*parser*/) {
-  printf("\n***HEADERS COMPLETE***\n\n");
+  LOGF("\n***HEADERS COMPLETE***\n\n");
   return 0;
 }
 
 int on_url(http_parser* /*parser*/, const char* at, size_t length) {
-  printf("Url: %.*s\n", (int)length, at);
+  LOGF("Url: %.*s\n", (int)length, at);
   return 0;
 }
 
 int on_header_field(http_parser* /*parser*/, const char* at, size_t length) {
-  printf("Header field: %.*s\n", (int)length, at);
+  LOGF("Header field: %.*s\n", (int)length, at);
   return 0;
 }
 
 int on_header_value(http_parser* /*parser*/, const char* at, size_t length) {
-  printf("Header value: %.*s\n", (int)length, at);
+  LOGF("Header value: %.*s\n", (int)length, at);
   return 0;
 }
 
 int on_body(http_parser* /*parser*/, const char* at, size_t length) {
-  printf("Body: %.*s\n", (int)length, at);
+  LOGF("Body: %.*s\n", (int)length, at);
   return 0;
 }
 int on_message_complete(http_parser* parser) {
-  printf("\n***MESSAGE COMPLETE***\n\n");
+  LOGF("\n***MESSAGE COMPLETE***\n\n");
 
   client_t* client = (client_t*) parser->data;
   
