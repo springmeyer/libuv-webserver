@@ -5,7 +5,7 @@ all: ./build ./webclient ./webserver
 	git clone --depth 1 git://github.com/joyent/http-parser.git ./deps/http-parser
 
 ./deps/libuv:
-	git clone --depth 1 git://github.com/joyent/libuv.git ./deps/libuv
+	git clone --depth 1 git://github.com/libuv/libuv.git ./deps/libuv
 
 ./deps/gyp:
 	git clone --depth 1 https://chromium.googlesource.com/external/gyp.git ./deps/gyp
