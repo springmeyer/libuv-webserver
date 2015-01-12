@@ -17,15 +17,23 @@ static int request_num = 1;
 //static int req_num = 16000;
 static int req_num = 100;
 
+#ifdef DEBUG
 #define CHECK(status, msg) \
   if (status != 0) { \
     fprintf(stderr, "%s: %s\n", msg, uv_err_name(status)); \
     exit(1); \
   }
-#define UVERR(err, msg) fprintf(stderr, "%s: %s\n", msg, uv_strerror(err))
+#define UVERR(err, msg) fprintf(stderr, "%s: %s\n", msg, uv_err_name(err))
 #define LOG_ERROR(msg) puts(msg);
 #define LOG(msg) puts(msg);
-#define LOGF(fmt, params...) printf(fmt "\n", params);
+#define LOGF(...) printf(__VA_ARGS__);
+#else
+#define CHECK(status, msg)
+#define UVERR(err, msg)
+#define LOG_ERROR(msg)
+#define LOG(msg)
+#define LOGF(...)
+#endif
 
 struct client_t {
   client_t() :
@@ -53,8 +61,8 @@ void on_close(uv_handle_t* handle) {
 void on_read(uv_stream_t *tcp, ssize_t nread, const uv_buf_t * buf) {
     ssize_t parsed;
     client_t* client = (client_t*) tcp->data;
-    LOGF("on read: %ld",nread);
-    LOGF("on read buf.size: %ld",buf->len);
+    LOGF("on read: %ld\n",nread);
+    LOGF("on read buf.size: %ld\n",buf->len);
     if (nread > 0) {
         http_parser * parser = &client->parser;
         /*if (parser->http_errno == HPE_PAUSED) {
@@ -67,7 +75,7 @@ void on_read(uv_stream_t *tcp, ssize_t nread, const uv_buf_t * buf) {
         }
         else if (parsed != nread) {
           LOGF("parsed incomplete data: %ld/%ld bytes parsed\n", parsed, nread);
-          LOGF("\n*** %s ***\n\n",
+          LOGF("\n*** %s ***\n",
               http_errno_description(HTTP_PARSER_ERRNO(parser)));
         }
     } else {
@@ -99,7 +107,7 @@ void on_connect(uv_connect_t *req, int status) {
   
     client->request_num++;
 
-    LOGF("[ %5d ] new connection", request_num);
+    LOGF("[ %5d ] new connection\n", request_num);
 
     uv_buf_t resbuf;
     std::string res =
@@ -124,32 +132,32 @@ void on_connect(uv_connect_t *req, int status) {
 }
 
 int on_message_begin(http_parser* /*parser*/) {
-  printf("\n***MESSAGE BEGIN***\n");
+  LOGF("\n***MESSAGE BEGIN***\n");
   return 0;
 }
 
 int on_headers_complete(http_parser* /*parser*/) {
-  printf("\n***HEADERS COMPLETE***\n");
+  LOGF("\n***HEADERS COMPLETE***\n");
   return 0;
 }
 
 int on_url(http_parser* /*parser*/, const char* at, size_t length) {
-  printf("Url: %.*s\n", (int)length, at);
+  LOGF("Url: %.*s\n", (int)length, at);
   return 0;
 }
 
 int on_header_field(http_parser* /*parser*/, const char* at, size_t length) {
-  printf("Header field: %.*s\n", (int)length, at);
+  LOGF("Header field: %.*s\n", (int)length, at);
   return 0;
 }
 
 int on_header_value(http_parser* /*parser*/, const char* at, size_t length) {
-  printf("Header value: %.*s\n", (int)length, at);
+  LOGF("Header value: %.*s\n", (int)length, at);
   return 0;
 }
 
 int on_body(http_parser* parser, const char* at, size_t length) {
-  printf("Body: %d\n", (int)length);
+  LOGF("Body: %d\n", (int)length);
   client_t *client = (client_t*)parser->data;
   if (at && client)
   {
@@ -169,12 +177,12 @@ int on_body(http_parser* parser, const char* at, size_t length) {
 }
 
 int on_message_complete(http_parser* parser) {
-  printf("\n***MESSAGE COMPLETE***\n\n");
+  LOGF("\n***MESSAGE COMPLETE***\n");
   client_t *client = (client_t*)parser->data;
   ssize_t total_len = client->body.str().size();
-  LOGF("total length parsed: %ld",total_len)
+  LOGF("total length parsed: %ld\n",total_len)
   if (http_should_keep_alive(parser)) {
-      printf("\n***SHOULD CLOSE keepalive HERE \n\n");
+      LOGF("\n***SHOULD CLOSE keepalive HERE \n");
       uv_stream_t* tcp = (uv_stream_t*)&client->tcp;
       uv_close((uv_handle_t*)tcp, on_close);
   }
@@ -189,7 +197,7 @@ void on_resolved(uv_getaddrinfo_t *req, int status, struct addrinfo *res) {
 
     char addr[17] = {'\0'};
     uv_ip4_name((struct sockaddr_in*) res->ai_addr, addr, 16);
-    fprintf(stderr, "resolved to %s\n", addr);
+    LOGF("resolved to %s\n", addr);
     uv_freeaddrinfo(res);
     struct sockaddr_in dest;
     int r = uv_ip4_addr(addr, 8000, &dest);
@@ -215,7 +223,7 @@ int main() {
     // mainly for osx, bump up ulimit
     struct rlimit limit;
     getrlimit(RLIMIT_NOFILE,&limit);
-    LOGF("current ulimit: %lld",limit.rlim_cur);
+    LOGF("current ulimit: %lld\n",limit.rlim_cur);
     req_parser_settings.on_message_begin = on_message_begin;
     req_parser_settings.on_url = on_url;
     req_parser_settings.on_header_field = on_header_field;
