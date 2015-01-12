@@ -10,7 +10,7 @@
 #include <string>
 #include <sstream>
 #include <string>
-
+#include <iostream>
 #ifdef DEBUG
 #define CHECK(status, msg) \
   if (status != 0) { \
@@ -117,11 +117,9 @@ void render(uv_work_t* req) {
    LOGF("[ %5d ] render\n", client->request_num);
    std::string filepath(".");
    filepath += client->path;
-   bool exists = (access(filepath.c_str(),R_OK) != -1);
-   if (!exists) {
-      closure->result = "no access";
-      closure->response_code = "404 Not Found";
-   } else if (filepath[filepath.size()-1] == '/') {
+   std::string index_path = (filepath + "index.html");
+   bool has_index = (access(index_path.c_str(),R_OK) != -1);
+   if (/*!has_index &&*/ filepath[filepath.size()-1] == '/') {
       uv_fs_t scandir_req;
       int r = uv_fs_scandir(uv_loop, &scandir_req, filepath.c_str(), 0, NULL);
       uv_dirent_t dent;
@@ -142,7 +140,17 @@ void render(uv_work_t* req) {
       closure->result += "</ul></body></html>";
       uv_fs_req_cleanup(&scandir_req);
    } else {
-       FILE * f = fopen(filepath.c_str(),"rb");
+       std::string file_to_open = filepath;
+       if (has_index) {
+           file_to_open = index_path;
+       }
+       bool exists = (access(file_to_open.c_str(),R_OK) != -1);
+       if (!exists) {
+          closure->result = "no access";
+          closure->response_code = "404 Not Found";
+          return;
+       }
+       FILE * f = fopen(file_to_open.c_str(),"rb");
        if (f) {
           std::fseek(f, 0, SEEK_END);
           unsigned size = std::ftell(f);
@@ -150,8 +158,12 @@ void render(uv_work_t* req) {
           closure->result.resize(size);
           std::fread(&closure->result[0], size, 1, f);
           fclose(f);
-          if (endswith(filepath,"html")) {
+          if (endswith(file_to_open,"html")) {
               closure->content_type = "text/html";
+          } else if (endswith(file_to_open,"css")) {
+              closure->content_type = "text/css";
+          } else if (endswith(file_to_open,"js")) {
+              closure->content_type = "application/javascript";
           }
        } else {
           closure->result = "failed to open";
