@@ -4,6 +4,8 @@ Pure C (or C++) webserver based on libuv and http-parser
 
 Based on http://vimeo.com/24713213
 
+See also https://github.com/mafintosh/turbo-net
+
 
 ## Warning
 
