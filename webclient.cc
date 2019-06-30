@@ -98,8 +98,7 @@ void after_write(uv_write_t* /*req*/, int status) {
 
 void on_connect(uv_connect_t *req, int status) {
     client_t *client = (client_t*)req->handle->data;
-
-    if (status == -1) {
+    if (status < 0) {
         fprintf(stderr, "connect failed error %s\n", uv_err_name(status));
         uv_close((uv_handle_t*)req->handle, on_close);
         return;
