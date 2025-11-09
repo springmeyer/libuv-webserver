@@ -145,8 +145,13 @@ void render(uv_work_t* req) {
           unsigned size = std::ftell(f);
           std::fseek(f, 0, SEEK_SET);
           closure->result.resize(size);
-          std::fread(&closure->result[0], size, 1, f);
+          size_t bytes_read = std::fread(&closure->result[0], size, 1, f);
           fclose(f);
+          if (bytes_read != 1) {
+             closure->result = "failed to read file";
+             closure->response_code = "500 Internal Server Error";
+             return;
+          }
           if (endswith(file_to_open,"html")) {
               closure->content_type = "text/html";
           } else if (endswith(file_to_open,"css")) {
