@@ -1,6 +1,6 @@
 # libuv-webserver
 
-Pure C (or C++) webserver based on libuv and http-parser
+Pure C (or C++) webserver based on libuv and llhttp
 
 Based on http://vimeo.com/24713213
 
@@ -11,12 +11,22 @@ See also https://github.com/mafintosh/turbo-net
 
 This is not a real server and never will be - purely experimental.
 
-If you are interested in more robust server on top of libuv see [Haywire](https://github.com/kellabyte/Haywire).
-
 
 ## Build
 
+Requires CMake 3.10 or later.
+
     make
+
+This will:
+- Download llhttp v9.3.0 (release tarball with pre-generated C sources)
+- Download libuv v1.51.0 (release tarball)
+- Configure and build using CMake
+- Create `webserver` and `webclient` executables
+
+To test with AddressSanitizer and UndefinedBehaviorSanitizer:
+
+    make sanitizer
 
 ## TODO
 

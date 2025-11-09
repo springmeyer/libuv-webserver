@@ -4,7 +4,7 @@
 #include <cassert>
 #include <unistd.h> // _SC_NPROCESSORS_ONLN on OS X
 #include "uv.h"
-#include "http_parser.h"
+#include "llhttp.h"
 
 // stl
 #include <string>
@@ -31,11 +31,11 @@
 static int request_num = 1;
 static uv_loop_t* uv_loop;
 static uv_tcp_t server;
-static http_parser_settings parser_settings;
+static llhttp_settings_t parser_settings;
 
 struct client_t {
   uv_tcp_t handle;
-  http_parser parser;
+  llhttp_t parser;
   uv_write_t write_req;
   int request_num;
   std::string path;
@@ -52,16 +52,11 @@ void alloc_cb(uv_handle_t * /*handle*/, size_t suggested_size, uv_buf_t* buf) {
 }
 
 void on_read(uv_stream_t* tcp, ssize_t nread, const uv_buf_t * buf) {
-  ssize_t parsed;
   LOGF("on read: %ld\n",nread);
   client_t* client = (client_t*) tcp->data;
   if (nread >= 0) {
-    parsed = (ssize_t)http_parser_execute(
-        &client->parser, &parser_settings, buf->base, nread);
-    if (client->parser.upgrade) {
-      LOG_ERROR("parse error: cannot handle http upgrade");
-      uv_close((uv_handle_t*) &client->handle, on_close);
-    } else if (parsed < nread) {
+    llhttp_errno_t err = llhttp_execute(&client->parser, buf->base, nread);
+    if (err != HPE_OK) {
       LOG_ERROR("parse error");
       uv_close((uv_handle_t*) &client->handle, on_close);
     }
@@ -202,54 +197,52 @@ void after_render(uv_work_t* req) {
   CHECK(r, "write buff");
 }
 
-int on_message_begin(http_parser* /*parser*/) {
+int on_message_begin(llhttp_t* /*parser*/) {
   LOGF("\n***MESSAGE BEGIN***\n");
   return 0;
 }
 
-int on_headers_complete(http_parser* /*parser*/) {
+int on_headers_complete(llhttp_t* /*parser*/) {
   LOGF("\n***HEADERS COMPLETE***\n");
   return 0;
 }
 
-int on_url(http_parser* parser, const char* url, size_t length) {
+int on_url(llhttp_t* parser, const char* url, size_t length) {
   client_t* client = (client_t*) parser->data;
   LOGF("[ %5d ] on_url\n", client->request_num);
   LOGF("Url: %.*s\n", (int)length, url);
-  // TODO - use https://github.com/bnoordhuis/uriparser2 instead?
-  struct http_parser_url u;
-  int result = http_parser_parse_url(url, length, 0, &u);
-  if (result) {
-      fprintf(stderr, "\n\n*** failed to parse URL %s ***\n\n", url);
-      return -1;
-  } else {
-    if ((u.field_set & (1 << UF_PATH))) {
-      const char * data = url + u.field_data[UF_PATH].off;
-      client->path = std::string(data,u.field_data[UF_PATH].len);
+  // Simple URL parsing - just extract the path
+  std::string url_str(url, length);
+  size_t path_start = url_str.find('/');
+  if (path_start != std::string::npos) {
+    size_t query_start = url_str.find('?', path_start);
+    if (query_start != std::string::npos) {
+      client->path = url_str.substr(path_start, query_start - path_start);
     } else {
-      fprintf(stderr, "\n\n*** failed to parse PATH in URL %s ***\n\n", url);
-      return -1;
+      client->path = url_str.substr(path_start);
     }
+  } else {
+    client->path = "/";
   }
   return 0;
 }
 
-int on_header_field(http_parser* /*parser*/, const char* at, size_t length) {
+int on_header_field(llhttp_t* /*parser*/, const char* at, size_t length) {
   LOGF("Header field: %.*s\n", (int)length, at);
   return 0;
 }
 
-int on_header_value(http_parser* /*parser*/, const char* at, size_t length) {
+int on_header_value(llhttp_t* /*parser*/, const char* at, size_t length) {
   LOGF("Header value: %.*s\n", (int)length, at);
   return 0;
 }
 
-int on_body(http_parser* /*parser*/, const char* at, size_t length) {
+int on_body(llhttp_t* /*parser*/, const char* at, size_t length) {
   LOGF("Body: %.*s\n", (int)length, at);
   return 0;
 }
 
-int on_message_complete(http_parser* parser) {
+int on_message_complete(llhttp_t* parser) {
   client_t* client = (client_t*) parser->data;
   LOGF("[ %5d ] on_message_complete\n", client->request_num);
   render_baton *closure = new render_baton(client);
@@ -274,7 +267,7 @@ void on_connect(uv_stream_t* server_handle, int status) {
   LOGF("[ %5d ] new connection\n", request_num);
 
   uv_tcp_init(uv_loop, &client->handle);
-  http_parser_init(&client->parser, HTTP_REQUEST);
+  llhttp_init(&client->parser, HTTP_REQUEST, &parser_settings);
 
   client->parser.data = client;
   client->handle.data = client;
@@ -292,8 +285,9 @@ int main() {
   int cores = sysconf(_SC_NPROCESSORS_ONLN);
   printf("number of cores %d\n",cores);
   char cores_string[10];
-  sprintf(cores_string,"%d",cores);
+  snprintf(cores_string, sizeof(cores_string), "%d", cores);
   setenv("UV_THREADPOOL_SIZE",cores_string,1);
+  llhttp_settings_init(&parser_settings);
   parser_settings.on_url = on_url;
   // notification callbacks
   parser_settings.on_message_begin = on_message_begin;

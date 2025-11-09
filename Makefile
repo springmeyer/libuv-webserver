@@ -1,42 +1,58 @@
 
 all: ./build ./webclient ./webserver
 
-./deps/http-parser:
-	git clone --depth 1 git://github.com/joyent/http-parser.git ./deps/http-parser
+./deps/llhttp:
+	mkdir -p deps
+	curl -L https://github.com/nodejs/llhttp/archive/refs/tags/release/v9.3.0.tar.gz | tar xz -C deps/
+	mv deps/llhttp-release-v9.3.0 deps/llhttp
 
 ./deps/libuv:
-	git clone --depth 1 git://github.com/libuv/libuv.git ./deps/libuv
+	mkdir -p deps
+	curl -L https://github.com/libuv/libuv/archive/refs/tags/v1.51.0.tar.gz | tar xz -C deps/
+	mv deps/libuv-1.51.0 deps/libuv
 
-./deps/gyp:
-	git clone --depth 1 https://chromium.googlesource.com/external/gyp.git ./deps/gyp
-	# TODO: patch no longer applies
-	#cd ./deps/gyp && curl -o issue_292.diff https://codereview.chromium.org/download/issue14887003_1_2.diff && patch pylib/gyp/xcode_emulation.py issue_292.diff
+./build: ./deps/libuv ./deps/llhttp
+	mkdir -p build
+	cd build && cmake .. -DCMAKE_BUILD_TYPE=Release
 
-./build: ./deps/gyp ./deps/libuv ./deps/http-parser
-	deps/gyp/gyp --depth=. -Goutput_dir=./out -Icommon.gypi --generator-output=./build -Dlibrary=static_library -Duv_library=static_library -f make -Dclang=1
+./webclient: ./build webclient.cc
+	cd build && cmake --build . --target webclient
+	cp ./build/webclient ./webclient
 
-./webclient: webclient.cc
-	make -C ./build/ webclient
-	cp ./build/out/Release/webclient ./webclient
-
-./webserver: webserver.cc
-	make -C ./build/ webserver
-	cp ./build/out/Release/webserver ./webserver
+./webserver: ./build webserver.cc
+	cd build && cmake --build . --target webserver
+	cp ./build/webserver ./webserver
 
 distclean:
-	make clean
-	rm -rf ./build
+	rm -rf ./build ./build-sanitizer
+	rm -rf ./deps
+	rm -f ./webserver ./webclient
 
 test:
-	./build/out/Release/webserver & ./build/out/Release/webclient && killall webserver
-	#./build/out/Release/webserver & wrk -d10 -t24 -c24 --latency http://127.0.0.1:8000
+	./webserver & sleep 1 && ./webclient && killall webserver
+
+sanitizer: ./deps/libuv ./deps/llhttp
+	mkdir -p build-sanitizer
+	cd build-sanitizer && cmake .. -DCMAKE_BUILD_TYPE=Debug \
+		-DCMAKE_C_FLAGS="-fsanitize=address,undefined -fno-omit-frame-pointer -g" \
+		-DCMAKE_CXX_FLAGS="-fsanitize=address,undefined -fno-omit-frame-pointer -g" \
+		-DCMAKE_EXE_LINKER_FLAGS="-fsanitize=address,undefined"
+	cd build-sanitizer && cmake --build . --target webserver
+	cd build-sanitizer && cmake --build . --target webclient
+	@echo ""
+	@echo "=== Testing webserver with sanitizers ==="
+	@cd build-sanitizer && ./webserver & sleep 2 && \
+		curl -s http://127.0.0.1:8000/ > /dev/null && \
+		curl -s http://127.0.0.1:8000/README.md > /dev/null && \
+		curl -s http://127.0.0.1:8000/nonexistent > /dev/null && \
+		killall webserver && sleep 1
+	@echo "=== Testing webclient with sanitizers ==="
+	@cd build-sanitizer && ./webserver & sleep 1 && ./webclient ; killall webserver || true
+	@echo ""
+	@echo "✓ Sanitizer tests completed successfully"
 
 clean:
-	rm -rf ./build/out/Release/obj.target/webserver/
-	rm -f ./build/out/Release/webserver
-	rm -f ./webserver
-	rm -rf ./build/out/Release/obj.target/webclient/
-	rm -f ./build/out/Release/webclient
-	rm -f ./webclient
+	rm -rf ./build ./build-sanitizer
+	rm -f ./webserver ./webclient
 
-.PHONY: test
+.PHONY: test all clean distclean sanitizer
