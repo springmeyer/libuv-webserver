@@ -1,0 +1,57 @@
+name: Build
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+jobs:
+  build-linux:
+    name: Build on Linux (${{ matrix.arch }})
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x86_64
+            runner: ubuntu-latest
+          - arch: arm64
+            runner: ubuntu-24.04-arm64
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y build-essential cmake curl
+
+    - name: Build project
+      run: make
+
+    - name: Verify executables
+      run: |
+        ls -lh webserver webclient
+        file webserver webclient
+
+    - name: Run basic test
+      run: |
+        # Start webserver in background
+        ./webserver &
+        WEBSERVER_PID=$!
+
+        # Wait for server to start
+        sleep 2
+
+        # Test with curl
+        curl -f http://127.0.0.1:8000/ || (kill $WEBSERVER_PID; exit 1)
+
+        # Run webclient test
+        ./webclient || (kill $WEBSERVER_PID; exit 1)
+
+        # Stop webserver
+        kill $WEBSERVER_PID
+
+        echo "Tests passed!"
