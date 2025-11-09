@@ -9,7 +9,6 @@
 // stl
 #include <string>
 #include <sstream>
-#include <string>
 #include <iostream>
 #ifdef DEBUG
 #define CHECK(status, msg) \
@@ -28,6 +27,8 @@
 #define LOG(msg)
 #define LOGF(...)
 #endif
+
+static const int PORT = 8000;
 static int request_num = 1;
 static uv_loop_t* uv_loop;
 static uv_tcp_t server;
@@ -89,8 +90,7 @@ struct render_baton {
 
 void after_write(uv_write_t* req, int status) {
   CHECK(status, "write");
-  if (!uv_is_closing((uv_handle_t*)req->handle))
-  {
+  if (!uv_is_closing((uv_handle_t*)req->handle)) {
       render_baton *closure = static_cast<render_baton *>(req->data);
       delete closure;
       uv_close((uv_handle_t*)req->handle, on_close);
@@ -99,11 +99,8 @@ void after_write(uv_write_t* req, int status) {
 
 bool endswith(std::string const& value, std::string const& search)
 {
-    if (value.length() >= search.length()) {
-        return (0 == value.compare (value.length() - search.length(), search.length(), search));
-    } else {
-        return false;
-    }
+    return value.length() >= search.length() &&
+           value.compare(value.length() - search.length(), search.length(), search) == 0;
 }
 
 void render(uv_work_t* req) {
@@ -114,25 +111,22 @@ void render(uv_work_t* req) {
    filepath += client->path;
    std::string index_path = (filepath + "index.html");
    bool has_index = (access(index_path.c_str(),R_OK) != -1);
-   if (/*!has_index &&*/ filepath[filepath.size()-1] == '/') {
+   if (filepath[filepath.size()-1] == '/') {
       uv_fs_t scandir_req;
       int r = uv_fs_scandir(uv_loop, &scandir_req, filepath.c_str(), 0, NULL);
       uv_dirent_t dent;
       closure->content_type = "text/html";
-      closure->result = "<html><body><ul>";
+      std::ostringstream html;
+      html << "<html><body><ul>";
       while (UV_EOF != uv_fs_scandir_next(&scandir_req, &dent)) {
         std::string name = dent.name;
         if (dent.type == UV_DIRENT_DIR) {
           name += "/";
         }
-        closure->result += "<li><a href='";
-        closure->result += name;
-        closure->result += "'>";
-        closure->result += name;
-        closure->result += "</a></li>";
-        closure->result += "\n";
+        html << "<li><a href='" << name << "'>" << name << "</a></li>\n";
       }
-      closure->result += "</ul></body></html>";
+      html << "</ul></body></html>";
+      closure->result = html.str();
       uv_fs_req_cleanup(&scandir_req);
    } else {
        std::string file_to_open = filepath;
@@ -178,9 +172,9 @@ void after_render(uv_work_t* req) {
       << "Content-Type: " << closure->content_type << "\r\n"
       << "Connection: keep-alive\r\n"
       << "Content-Length: " << closure->result.size() << "\r\n"
-      << "Access-Control-Allow-Origin: *" << "\r\n"
-      << "\r\n";
-  rep << closure->result;
+      << "Access-Control-Allow-Origin: *\r\n"
+      << "\r\n"
+      << closure->result;
   std::string res = rep.str();
   uv_buf_t resbuf;
   resbuf.base = (char *)res.c_str();
@@ -303,12 +297,12 @@ int main() {
   r = uv_tcp_keepalive(&server,1,60);
   CHECK(r, "tcp_keepalive");
   struct sockaddr_in address;
-  r = uv_ip4_addr("0.0.0.0", 8000, &address);
+  r = uv_ip4_addr("0.0.0.0", PORT, &address);
   CHECK(r, "ip4_addr");
   r = uv_tcp_bind(&server, (const struct sockaddr*)&address, 0);
   CHECK(r, "tcp_bind");
   r = uv_listen((uv_stream_t*)&server, MAX_WRITE_HANDLES, on_connect);
   CHECK(r, "uv_listen");
-  LOG("listening on port 8000");
+  printf("listening on port %d\n", PORT);
   uv_run(uv_loop,UV_RUN_DEFAULT);
 }

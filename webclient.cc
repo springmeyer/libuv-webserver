@@ -9,12 +9,10 @@
 #include <iostream>
 #include <sstream>
 
-
+static const int PORT = 8000;
 static uv_loop_t* uv_loop;
 static llhttp_settings_t req_parser_settings;
 static int request_num = 1;
-// http://serverfault.com/questions/145907/does-mac-os-x-throttle-the-rate-of-socket-creation
-//static int req_num = 16000;
 static int req_num = 100;
 
 #ifdef DEBUG
@@ -54,7 +52,6 @@ void alloc_cb(uv_handle_t * /*handle*/, size_t suggested_size, uv_buf_t* buf) {
 void on_close(uv_handle_t* handle) {
   client_t* client = (client_t*) handle->data;
   LOG("on close")
-  //client->tcp.data = NULL;
   delete client;
 }
 
@@ -93,14 +90,15 @@ void on_connect(uv_connect_t *req, int status) {
 
     LOGF("[ %5d ] new connection\n", request_num);
 
+    std::ostringstream req_stream;
+    req_stream << "GET /hello HTTP/1.1\r\n"
+               << "Host: 0.0.0.0:" << PORT << "\r\n"
+               << "User-Agent: webclient.c\r\n"
+               << "Keep-Alive: 100\r\n"
+               << "Connection: keep-alive\r\n"
+               << "\r\n";
+    std::string res = req_stream.str();
     uv_buf_t resbuf;
-    std::string res =
-         "GET /hello HTTP/1.1\r\n"
-         "Host: 0.0.0.0=8000\r\n"
-         "User-Agent: webclient.c\r\n"
-         "Keep-Alive: 100\r\n"
-         "Connection: keep-alive\r\n"
-         "\r\n";
     resbuf.base = (char *)res.c_str();
     resbuf.len = res.size();
 
@@ -143,9 +141,8 @@ int on_header_value(llhttp_t* /*parser*/, const char* at, size_t length) {
 int on_body(llhttp_t* parser, const char* at, size_t length) {
   LOGF("Body: %d\n", (int)length);
   client_t *client = (client_t*)parser->data;
-  if (at && client)
-  {
-      client->body << std::string(at,length);
+  if (at && client) {
+      client->body << std::string(at, length);
   }
   return 0;
 }
@@ -172,10 +169,10 @@ void on_resolved(uv_getaddrinfo_t *req, int status, struct addrinfo *res) {
     LOGF("resolved to %s\n", addr);
     uv_freeaddrinfo(res);
     struct sockaddr_in dest;
-    int r = uv_ip4_addr(addr, 8000, &dest);
+    int r = uv_ip4_addr(addr, PORT, &dest);
     CHECK(r, "ip4_addr");
 
-    for (int i=0;i<req_num;++i) {
+    for (int i = 0; i < req_num; ++i) {
         client_t* client = new client_t();
         client->request_num = request_num;
         client->tcp.data = client;
@@ -188,7 +185,7 @@ void on_resolved(uv_getaddrinfo_t *req, int status, struct addrinfo *res) {
         r = uv_tcp_connect(&client->connect_req, &client->tcp, (const struct sockaddr*)&dest, on_connect);
         CHECK(r, "tcp_connect");
     }
-    LOG("listening on port 8000");
+    printf("connecting to port %d\n", PORT);
 }
 
 int main() {
@@ -211,6 +208,8 @@ int main() {
     hints.ai_flags = 0;
     uv_loop = uv_default_loop();
     uv_getaddrinfo_t req;
-    int r = uv_getaddrinfo(uv_loop, &req, on_resolved, "localhost", "8000", &hints);
-    uv_run(uv_loop,UV_RUN_DEFAULT);
+    char port_str[6];
+    snprintf(port_str, sizeof(port_str), "%d", PORT);
+    int r = uv_getaddrinfo(uv_loop, &req, on_resolved, "localhost", port_str, &hints);
+    uv_run(uv_loop, UV_RUN_DEFAULT);
 }

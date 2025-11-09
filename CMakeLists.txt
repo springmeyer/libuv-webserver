@@ -24,24 +24,25 @@ target_include_directories(llhttp PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/deps/llhttp/include
 )
 
-# Webserver executable
-add_executable(webserver webserver.cc)
-target_link_libraries(webserver PRIVATE uv_a llhttp)
-target_include_directories(webserver PRIVATE
+# Common dependencies and include directories
+set(COMMON_LIBS uv_a llhttp)
+set(COMMON_INCLUDES
     ${CMAKE_CURRENT_SOURCE_DIR}/deps/libuv/include
     ${CMAKE_CURRENT_SOURCE_DIR}/deps/llhttp/include
 )
 
-# Webclient executable
-add_executable(webclient webclient.cc)
-target_link_libraries(webclient PRIVATE uv_a llhttp)
-target_include_directories(webclient PRIVATE
-    ${CMAKE_CURRENT_SOURCE_DIR}/deps/libuv/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/deps/llhttp/include
-)
+# Helper function to create executables with common settings
+function(add_uv_executable target_name source_file)
+    add_executable(${target_name} ${source_file})
+    target_link_libraries(${target_name} PRIVATE ${COMMON_LIBS})
+    target_include_directories(${target_name} PRIVATE ${COMMON_INCLUDES})
 
-# macOS specific - CoreFoundation needed for debugging tools like Instruments
-if(APPLE)
-    target_link_libraries(webserver PRIVATE "-framework CoreFoundation")
-    target_link_libraries(webclient PRIVATE "-framework CoreFoundation")
-endif()
+    # macOS specific - CoreFoundation needed for debugging tools like Instruments
+    if(APPLE)
+        target_link_libraries(${target_name} PRIVATE "-framework CoreFoundation")
+    endif()
+endfunction()
+
+# Create executables
+add_uv_executable(webserver webserver.cc)
+add_uv_executable(webclient webclient.cc)
