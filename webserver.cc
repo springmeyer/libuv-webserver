@@ -151,8 +151,14 @@ void render(uv_work_t* req) {
        FILE * f = fopen(file_to_open.c_str(),"rb");
        if (f) {
           std::fseek(f, 0, SEEK_END);
-          unsigned size = std::ftell(f);
+          long size = std::ftell(f);
           std::fseek(f, 0, SEEK_SET);
+          if (size < 0) {
+             fclose(f);
+             closure->result = "failed to read file";
+             closure->response_code = "500 Internal Server Error";
+             return;
+          }
           closure->result.resize(size);
           // fread returns the element count, which is 0 for a zero-byte file.
           // Treat an empty file as a successful read rather than an error.
