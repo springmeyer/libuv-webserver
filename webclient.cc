@@ -42,6 +42,7 @@ struct client_t {
   uv_connect_t connect_req;
   uv_shutdown_t shutdown_req;
   uv_write_t write_req;
+  std::string request;
   std::stringstream body;
 };
 
@@ -97,10 +98,12 @@ void on_connect(uv_connect_t *req, int status) {
                << "Keep-Alive: 100\r\n"
                << "Connection: keep-alive\r\n"
                << "\r\n";
-    std::string res = req_stream.str();
+    // Store the request in the client so the buffer stays valid until
+    // after_write runs: uv_write is async and does not copy it.
+    client->request = req_stream.str();
     uv_buf_t resbuf;
-    resbuf.base = (char *)res.c_str();
-    resbuf.len = res.size();
+    resbuf.base = &client->request[0];
+    resbuf.len = client->request.size();
 
     int rr = uv_read_start(req->handle, alloc_cb, on_read);
     CHECK(rr, "bind");
@@ -159,7 +162,7 @@ int on_message_complete(llhttp_t* parser) {
 }
 
 void on_resolved(uv_getaddrinfo_t *req, int status, struct addrinfo *res) {
-    if (status == -1) {
+    if (status < 0) {
         fprintf(stderr, "getaddrinfo callback error %s\n", uv_err_name(status));
         return;
     }
