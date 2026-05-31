@@ -182,7 +182,7 @@ void after_render(uv_work_t* req) {
   std::ostringstream rep;
   rep << "HTTP/1.1 " << closure->response_code << "\r\n"
       << "Content-Type: " << closure->content_type << "\r\n"
-      << "Connection: keep-alive\r\n"
+      << "Connection: close\r\n"
       << "Content-Length: " << closure->result.size() << "\r\n"
       << "Access-Control-Allow-Origin: *\r\n"
       << "\r\n"
