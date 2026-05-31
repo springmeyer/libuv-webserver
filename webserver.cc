@@ -107,6 +107,11 @@ void render(uv_work_t* req) {
    render_baton *closure = static_cast<render_baton *>(req->data);
    client_t* client = (client_t*) closure->client;
    LOGF("[ %5d ] render\n", client->request_num);
+   if (client->path.find("..") != std::string::npos) {
+      closure->result = "forbidden";
+      closure->response_code = "403 Forbidden";
+      return;
+   }
    std::string filepath(".");
    filepath += client->path;
    std::string index_path = (filepath + "index.html");
