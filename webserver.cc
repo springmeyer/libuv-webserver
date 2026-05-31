@@ -40,6 +40,10 @@ struct client_t {
   uv_write_t write_req;
   int request_num;
   std::string path;
+  // Set once render work is queued. From then on the response path owns the
+  // client lifetime, so on_read must not close (and free) it underneath the
+  // in-flight work.
+  bool responding;
 };
 
 void on_close(uv_handle_t* handle) {
@@ -57,7 +61,7 @@ void on_read(uv_stream_t* tcp, ssize_t nread, const uv_buf_t * buf) {
   client_t* client = (client_t*) tcp->data;
   if (nread >= 0) {
     llhttp_errno_t err = llhttp_execute(&client->parser, buf->base, nread);
-    if (err != HPE_OK) {
+    if (err != HPE_OK && !client->responding) {
       LOG_ERROR("parse error");
       uv_close((uv_handle_t*) &client->handle, on_close);
     }
@@ -65,7 +69,9 @@ void on_read(uv_stream_t* tcp, ssize_t nread, const uv_buf_t * buf) {
     if (nread != UV_EOF) {
       UVERR(nread, "read");
     }
-    uv_close((uv_handle_t*) &client->handle, on_close);
+    if (!client->responding) {
+      uv_close((uv_handle_t*) &client->handle, on_close);
+    }
   }
   free(buf->base);
 }
@@ -271,6 +277,11 @@ int on_message_complete(llhttp_t* parser) {
                  (uv_after_work_cb)after_render);
   CHECK(status, "uv_queue_work");
   assert(status == 0);
+
+  // The response path now owns this client. Stop reading so no further request
+  // is parsed and no read callback can close the client while render runs.
+  client->responding = true;
+  uv_read_stop((uv_stream_t*)&client->handle);
 
   return 0;
 }
