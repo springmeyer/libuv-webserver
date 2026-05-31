@@ -28,7 +28,8 @@
 #define LOGF(...)
 #endif
 
-static const int PORT = 8000;
+static const int DEFAULT_PORT = 8000;
+static int PORT = DEFAULT_PORT;
 static int request_num = 1;
 static uv_loop_t* uv_loop;
 static uv_tcp_t server;
@@ -310,8 +311,24 @@ void on_connect(uv_stream_t* server_handle, int status) {
 
 #define MAX_WRITE_HANDLES 1000
 
+// Listen port. Defaults to DEFAULT_PORT; override with the PORT env var.
+static int resolve_port() {
+  const char* env = getenv("PORT");
+  if (env == nullptr || env[0] == '\0') {
+    return DEFAULT_PORT;
+  }
+  char* end = nullptr;
+  long port = strtol(env, &end, 10);
+  if (*end != '\0' || port < 1 || port > 65535) {
+    fprintf(stderr, "invalid PORT '%s' (expected 1-65535)\n", env);
+    exit(1);
+  }
+  return static_cast<int>(port);
+}
+
 int main() {
   signal(SIGPIPE, SIG_IGN);
+  PORT = resolve_port();
   int cores = sysconf(_SC_NPROCESSORS_ONLN);
   printf("number of cores %d\n",cores);
   char cores_string[10];

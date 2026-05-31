@@ -6,8 +6,9 @@ source "$(dirname "$0")/lib.sh"
 
 base="$(mktemp -d)"
 docroot="$base/pub"
+secret="TOP-SECRET"
 mkdir -p "$docroot"
-echo "TOP-SECRET" > "$base/secret.txt"
+echo "$secret" > "$base/secret.txt"
 
 build_server
 start_server "$docroot" || exit 1
@@ -19,7 +20,7 @@ stop_server
 
 [ "$code" = "403" ] && ok "traversal rejected with 403" || bad "expected 403, got $code"
 case "$body" in
-  *TOP-SECRET*) bad "secret file contents leaked through traversal" ;;
-  *)            ok "secret contents not leaked" ;;
+  *"$secret"*) bad "secret file contents leaked through traversal" ;;
+  *)           ok "secret contents not leaked" ;;
 esac
 finish

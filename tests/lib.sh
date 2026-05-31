@@ -6,7 +6,7 @@ set -u
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 BUILD_DIR="${BUILD_DIR:-$ROOT/build}"
 SERVER_BIN="$BUILD_DIR/webserver"
-PORT="${PORT:-8000}"
+export PORT="${PORT:-8000}"
 SERVER_PID=""
 SERVER_LOG=""
 

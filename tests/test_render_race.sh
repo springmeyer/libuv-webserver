@@ -24,11 +24,12 @@ build_asan_server
 export ASAN_OPTIONS="abort_on_error=0:exitcode=0"
 start_server "$docroot" || exit 1
 
-python3 - <<'PY'
-import socket, threading
+PORT="$PORT" python3 - <<'PY'
+import socket, threading, os
+PORT = int(os.environ["PORT"])
 def hit():
     try:
-        s = socket.create_connection(("127.0.0.1", 8000))
+        s = socket.create_connection(("127.0.0.1", PORT))
         s.sendall(b"GET /big.bin HTTP/1.1\r\nHost: x\r\n\r\n")
         s.close()            # close immediately, while render is queued/running
     except OSError:

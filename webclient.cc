@@ -9,7 +9,8 @@
 #include <iostream>
 #include <sstream>
 
-static const int PORT = 8000;
+static const int DEFAULT_PORT = 8000;
+static int PORT = DEFAULT_PORT;
 static uv_loop_t* uv_loop;
 static llhttp_settings_t req_parser_settings;
 static int request_num = 1;
@@ -32,6 +33,21 @@ static int req_num = 100;
 #define LOG(msg)
 #define LOGF(...)
 #endif
+
+// Connect port. Defaults to DEFAULT_PORT; override with the PORT env var.
+static int resolve_port() {
+  const char* env = getenv("PORT");
+  if (env == nullptr || env[0] == '\0') {
+    return DEFAULT_PORT;
+  }
+  char* end = nullptr;
+  long port = strtol(env, &end, 10);
+  if (*end != '\0' || port < 1 || port > 65535) {
+    fprintf(stderr, "invalid PORT '%s' (expected 1-65535)\n", env);
+    exit(1);
+  }
+  return static_cast<int>(port);
+}
 
 struct client_t {
   client_t() :
@@ -192,6 +208,7 @@ void on_resolved(uv_getaddrinfo_t *req, int status, struct addrinfo *res) {
 }
 
 int main() {
+    PORT = resolve_port();
     // mainly for osx, bump up ulimit
     struct rlimit limit;
     getrlimit(RLIMIT_NOFILE,&limit);
