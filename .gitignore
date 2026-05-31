@@ -1,3 +1,5 @@
 build
+build-asan
+build-sanitizer
 deps
 .DS_Store

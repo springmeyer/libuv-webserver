@@ -145,7 +145,9 @@ void render(uv_work_t* req) {
           unsigned size = std::ftell(f);
           std::fseek(f, 0, SEEK_SET);
           closure->result.resize(size);
-          size_t bytes_read = std::fread(&closure->result[0], size, 1, f);
+          // fread returns the element count, which is 0 for a zero-byte file.
+          // Treat an empty file as a successful read rather than an error.
+          size_t bytes_read = (size > 0) ? std::fread(&closure->result[0], size, 1, f) : 1;
           fclose(f);
           if (bytes_read != 1) {
              closure->result = "failed to read file";
