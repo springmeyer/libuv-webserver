@@ -82,6 +82,7 @@ struct render_baton {
     }
     client_t* client;
     uv_work_t request;
+    std::string headers;
     std::string result;
     std::string response_code;
     std::string content_type;
@@ -185,20 +186,23 @@ void after_render(uv_work_t* req) {
       << "Connection: close\r\n"
       << "Content-Length: " << closure->result.size() << "\r\n"
       << "Access-Control-Allow-Origin: *\r\n"
-      << "\r\n"
-      << closure->result;
-  std::string res = rep.str();
-  uv_buf_t resbuf;
-  resbuf.base = (char *)res.c_str();
-  resbuf.len = res.size();
+      << "\r\n";
+  // Store the response in the closure so the buffers stay valid until
+  // after_write runs: uv_write is async and does not copy them.
+  closure->headers = rep.str();
+
+  uv_buf_t bufs[2];
+  bufs[0] = uv_buf_init(&closure->headers[0], closure->headers.size());
+  bufs[1] = uv_buf_init(closure->result.empty() ? NULL : &closure->result[0],
+                        closure->result.size());
 
   client->write_req.data = closure;
 
   // https://github.com/joyent/libuv/issues/344
   int r = uv_write(&client->write_req,
           (uv_stream_t*)&client->handle,
-          &resbuf,
-          1,
+          bufs,
+          2,
           after_write);
   CHECK(r, "write buff");
 }
