@@ -91,9 +91,12 @@ struct render_baton {
 
 void after_write(uv_write_t* req, int status) {
   CHECK(status, "write");
+  // Always free the closure. When the handle is already closing (for example
+  // the peer hung up while this write was queued) uv_write still invokes this
+  // callback, and skipping the delete leaked the render_baton and its body.
+  render_baton *closure = static_cast<render_baton *>(req->data);
+  delete closure;
   if (!uv_is_closing((uv_handle_t*)req->handle)) {
-      render_baton *closure = static_cast<render_baton *>(req->data);
-      delete closure;
       uv_close((uv_handle_t*)req->handle, on_close);
   }
 }
